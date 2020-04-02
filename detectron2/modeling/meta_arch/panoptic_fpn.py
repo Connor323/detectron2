@@ -42,8 +42,10 @@ class PanopticFPN(nn.Module):
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.sem_seg_head = build_sem_seg_head(cfg, self.backbone.output_shape())
 
-        pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(3, 1, 1)
-        pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).to(self.device).view(3, 1, 1)
+        self.in_features = cfg.MODEL.SEM_SEG_HEAD.IN_FEATURES
+
+        pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(len(cfg.MODEL.PIXEL_MEAN), 1, 1)
+        pixel_std = torch.Tensor(cfg.MODEL.PIXEL_STD).to(self.device).view(len(cfg.MODEL.PIXEL_MEAN), 1, 1)
         self.normalizer = lambda x: (x - pixel_mean) / pixel_std
         self.to(self.device)
 
@@ -76,6 +78,14 @@ class PanopticFPN(nn.Module):
         images = [self.normalizer(x) for x in images]
         images = ImageList.from_tensors(images, self.backbone.size_divisibility)
         features = self.backbone(images.tensor)
+
+        post_images = [x["post_image"].to(self.device) for x in batched_inputs]
+        post_images = [self.normalizer(x) for x in post_images]
+        post_images = ImageList.from_tensors(post_images, self.backbone.size_divisibility)
+        post_features = self.backbone(post_images.tensor)
+
+        for f in self.in_features:
+            features[f] = features[f] - post_features[f]
 
         if "proposals" in batched_inputs[0]:
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
