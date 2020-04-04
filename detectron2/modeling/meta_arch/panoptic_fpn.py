@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 from detectron2.structures import ImageList
+from detectron2.utils.events import get_event_storage
 
 from ..backbone import build_backbone
 from ..postprocessing import detector_postprocess, sem_seg_postprocess
@@ -111,6 +112,11 @@ class PanopticFPN(nn.Module):
         )
 
         if self.training:
+            storage = get_event_storage()
+            if storage.iter % 100 == 0: 
+                storage.put_image("input/pre_image", batched_inputs[0]['image'])
+                storage.put_image("input/post_image", batched_inputs[0]['post_image'])
+
             losses = {}
             losses.update(sem_seg_losses)
             losses.update({k: v * self.instance_loss_weight for k, v in detector_losses.items()})

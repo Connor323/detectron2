@@ -9,6 +9,7 @@ from torch.nn import functional as F
 from detectron2.layers import Conv2d, ShapeSpec
 from detectron2.structures import ImageList
 from detectron2.utils.registry import Registry
+from detectron2.utils.events import get_event_storage
 
 from ..backbone import build_backbone
 from ..postprocessing import sem_seg_postprocess
@@ -177,6 +178,12 @@ class SemSegFPNHead(nn.Module):
         return x
 
     def losses(self, predictions, targets):
+        storage = get_event_storage()
+        if storage.iter % 100 == 0: 
+            prediction = torch.max(predictions[0], 0, keepdim=True)[1]
+            storage.put_image("sem_seg/prediction", prediction)
+            storage.put_image("sem_seg/targets", targets[0].unsqueeze(0))
+
         predictions = F.interpolate(
             predictions, scale_factor=self.common_stride, mode="bilinear", align_corners=False
         )
